@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause } from "lucide-react";
-import { Village } from "@/lib/villages";
+import { VILLAGES, Village } from "@/lib/villages";
 
 type Script = "romi" | "devanagari";
+
+export type RadioSubtitleHandle = {
+  loadAndPlay: (v: Village) => void;
+};
 
 function fmt(sec: number) {
   const m = Math.floor(sec / 60);
@@ -16,14 +20,14 @@ function fmt(sec: number) {
 // Cache measured durations per village across plays, since speechSynthesis gives no upfront length.
 const measuredDurations: Record<string, number> = {};
 
-export default function RadioSubtitle({ village }: { village: Village }) {
+const RadioSubtitle = forwardRef<RadioSubtitleHandle>(function RadioSubtitle(_props, ref) {
+  const [village, setVillage] = useState<Village>(VILLAGES[0]);
   const [script, setScript] = useState<Script>("romi");
   const [playing, setPlaying] = useState(false);
   const [wordIdx, setWordIdx] = useState(-1);
   const [elapsed, setElapsed] = useState(0);
   const [supported, setSupported] = useState(true);
 
-  const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
   const startRef = useRef<number>(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -32,21 +36,53 @@ export default function RadioSubtitle({ village }: { village: Village }) {
 
   useEffect(() => {
     setSupported(typeof window !== "undefined" && "speechSynthesis" in window);
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+      if (tickRef.current) clearInterval(tickRef.current);
+    };
   }, []);
 
+  // Only resets the highlight when the script is switched mid-view — never touches audio.
   useEffect(() => {
-    stop();
-    setWordIdx(-1);
-    setElapsed(0);
+    if (!playing) setWordIdx(-1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [village, script]);
+  }, [script]);
 
-  useEffect(() => () => stop(), []);
-
-  function stop() {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+  /** The single source of truth for starting narration — used by both the play button and the map. */
+  function speak(v: Village) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
     if (tickRef.current) clearInterval(tickRef.current);
-    setPlaying(false);
+
+    setVillage(v);
+    setElapsed(0);
+    setWordIdx(-1);
+
+    const wordCount = v[script].split(" ").length;
+    const utter = new SpeechSynthesisUtterance(v.english);
+    utter.rate = 0.95;
+
+    utter.onboundary = (e) => {
+      if (e.name !== "word") return;
+      const progress = e.charIndex / v.english.length;
+      setWordIdx(Math.min(wordCount - 1, Math.floor(progress * wordCount)));
+    };
+    utter.onstart = () => {
+      startRef.current = Date.now();
+      setPlaying(true);
+      tickRef.current = setInterval(() => setElapsed((Date.now() - startRef.current) / 1000), 100);
+    };
+    utter.onend = () => {
+      measuredDurations[v.id] = (Date.now() - startRef.current) / 1000;
+      if (tickRef.current) clearInterval(tickRef.current);
+      setPlaying(false);
+      setWordIdx(wordCount - 1);
+    };
+    utter.onerror = () => {
+      if (tickRef.current) clearInterval(tickRef.current);
+      setPlaying(false);
+    };
+    window.speechSynthesis.speak(utter);
   }
 
   function togglePlay() {
@@ -57,36 +93,19 @@ export default function RadioSubtitle({ village }: { village: Village }) {
       setPlaying(false);
       return;
     }
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(village.english);
-    utter.rate = 0.95;
-
-    utter.onboundary = (e) => {
-      if (e.name !== "word") return;
-      const progress = e.charIndex / village.english.length;
-      setWordIdx(Math.min(words.length - 1, Math.floor(progress * words.length)));
-    };
-    utter.onstart = () => {
-      startRef.current = Date.now();
-      setPlaying(true);
-      tickRef.current = setInterval(() => setElapsed((Date.now() - startRef.current) / 1000), 100);
-    };
-    utter.onend = () => {
-      measuredDurations[village.id] = (Date.now() - startRef.current) / 1000;
-      if (tickRef.current) clearInterval(tickRef.current);
-      setPlaying(false);
-      setWordIdx(words.length - 1);
-    };
-    utter.onerror = () => {
-      if (tickRef.current) clearInterval(tickRef.current);
-      setPlaying(false);
-    };
-    utterRef.current = utter;
-    window.speechSynthesis.speak(utter);
+    speak(village);
   }
 
+  useImperativeHandle(ref, () => ({
+    loadAndPlay: (v: Village) => speak(v),
+  }));
+
   return (
-    <section className="rounded-[18px] border p-5 sm:p-7 shadow-sm" style={{ background: "var(--card)", borderColor: "var(--line)" }}>
+    <section
+      id="radio-card"
+      className="rounded-[18px] border p-5 sm:p-7 shadow-sm"
+      style={{ background: "var(--card)", borderColor: "var(--line)" }}
+    >
       <div className="flex items-center justify-between border-b pb-3 mb-5" style={{ borderColor: "var(--line)" }}>
         <h2 className="font-serif text-lg" style={{ color: "var(--sub)" }}>
           The Elder&rsquo;s Voice — narration preview
@@ -184,4 +203,6 @@ export default function RadioSubtitle({ village }: { village: Village }) {
       </div>
     </section>
   );
-}
+});
+
+export default RadioSubtitle;
