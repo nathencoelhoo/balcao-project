@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #F9F6F0;
+  --card: #ffffff;
+  --text: #1E1E1E;
+  --sub: #6b5f52;
+  --line: #e7ddc9;
+  --linen-2: #F1EADC;
+}
+.dark {
+  --bg: #161210;
+  --card: #1f1a17;
+  --text: #F1E9DC;
+  --sub: #b8ab98;
+  --line: #332a24;
+  --linen-2: #241e1a;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.3s, color 0.3s;
+}
+
+.tape-edge {
+  height: 5px;
+  background-image: repeating-linear-gradient(90deg, #A33226 0 14px, #E5A93C 14px 28px);
+}
+
+@keyframes pulseRing {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.ping-ring { animation: pulseRing 2.2s cubic-bezier(0.2, 0.7, 0.3, 1) infinite; }
+.ping-ring.d2 { animation-delay: 0.6s; }
+
+@keyframes breatheDot {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+.breath-glyph span {
+  width: 4px; height: 4px; border-radius: 50%; background: #E5A93C;
+  display: inline-block; animation: breatheDot 1s ease-in-out infinite;
+}
+.breath-glyph span:nth-child(2) { animation-delay: 0.15s; }
+.breath-glyph span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes micPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(163,50,38,.55), 0 8px 30px rgba(163,50,38,.5); }
+  50% { box-shadow: 0 0 0 22px rgba(163,50,38,0), 0 8px 30px rgba(163,50,38,.5); }
+}
+.mic-live { animation: micPulse 1.6s ease-in-out infinite; }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
