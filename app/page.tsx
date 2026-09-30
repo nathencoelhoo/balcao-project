@@ -1,14 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useRef } from "react";
 import ExtinctionClock from "@/components/ExtinctionClock";
-import RadioSubtitle from "@/components/RadioSubtitle";
+import RadioSubtitle, { RadioSubtitleHandle } from "@/components/RadioSubtitle";
 import GeoSonicMap from "@/components/GeoSonicMap";
 import ElderRecorder from "@/components/ElderRecorder";
-import { VILLAGES, Village } from "@/lib/villages";
+import { Village } from "@/lib/villages";
 
 export default function Home() {
-  const [nowPlaying, setNowPlaying] = useState<Village>(VILLAGES[0]);
+  const radioRef = useRef<RadioSubtitleHandle>(null);
+
+  function handlePlay(v: Village) {
+    radioRef.current?.loadAndPlay(v);
+    document.getElementById("radio-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
     <>
@@ -34,8 +39,8 @@ export default function Home() {
 
       <main className="max-w-5xl mx-auto px-5 sm:px-8 pb-24 space-y-16">
         <ExtinctionClock />
-        <RadioSubtitle village={nowPlaying} />
-        <GeoSonicMap onPlay={setNowPlaying} />
+        <RadioSubtitle ref={radioRef} />
+        <GeoSonicMap onPlay={handlePlay} />
         <ElderRecorder />
       </main>
 
